@@ -539,3 +539,300 @@ Without /etc/busybox.conf, it still runs — just with less paranoia.
 Mess up the file format? You get a “Parse error” roast on stderr.
 
 Perfect place for privilege escalation bugs if misconfigured. 😉
+but lets take a deep breath, and start going towards the init.rd files, to see what runs as the system begins, and may give us access to a life full of pleasure and "debug options"
+
+```bash
+_F601_V6.0.1P1T12_UPGRADE_BOOTLDR.bin.extracted/_140.extracted/cpio-root/etc/init.d$ file rcS 
+rcS: POSIX shell script, ISO-8859 text executable
+_F601_V6.0.1P1T12_UPGRADE_BOOTLDR.bin.extracted/_140.extracted/cpio-root/etc/init.d$ file regioncode 
+regioncode: ASCII text
+_F601_V6.0.1P1T12_UPGRADE_BOOTLDR.bin.extracted/_140.extracted/cpio-root/etc/init.d$ ll
+total 20
+drwxr-xr-x 2 bash bash 4096 Aug 11 20:12 ./
+drwxr-xr-x 7 bash bash 4096 Aug 11 20:12 ../
+-rwxr-xr-x 1 bash bash 4716 Aug 11 20:12 rcS*
+-rwxr-xr-x 1 bash bash   24 Aug 11 20:12 regioncode*
+```
+
+ok 2 shell script executable, allways a good sign.
+lets print out rcS:
+```bash
+_F601_V6.0.1P1T12_UPGRADE_BOOTLDR.bin.extracted/_140.extracted/cpio-root/etc/init.d$ cat rcS 
+#!/bin/sh
+#	$Id: rcS,v 1.7 2007/10/25 21:58:06 jwessel Exp $
+# This is a minmal rcS file for target startup
+# Make sure that /proc is mounted.
+mount -a
+
+#
+#	Assign an address to the loopback device.
+#
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+runlevel=S
+prevlevel=N
+umask 022
+
+export PATH runlevel prevlevel
+export VERBOSE
+
+#
+#	Trap CTRL-C &c only in this shell so we can interrupt subprocesses.
+#
+trap ":" INT QUIT TSTP
+
+#
+#	Call all parts in order.
+#
+for i in /etc/rcS.d/S??*
+do
+	# Ignore dangling symlinks for now.
+	[ ! -f "$i" ] && continue
+
+	case "$i" in
+		*.sh)
+			# Source shell script for speed.
+			(
+				trap - INT QUIT TSTP
+				set start
+				. $i
+			)
+			;;
+		*)
+			# No sh extension, so fork subprocess.
+			$i start
+			;;
+	esac
+done
+
+#
+# Resume default configuration file
+# 0 - Default, 1 - Russia, 2 - Lithuania, 3 - Romania, 4 - Singapore
+#
+USR_DB_CFG_TYPE_MAX=300
+USR_DB_DEFAULT_CFG_XML=/userconfig/cfg/db_default_cfg.xml
+USR_DB_USER_CFG_XML=$USR_DB_USER_CFG_XML
+USR_DB_BACKUP_CFG_XML=/userconfig/cfg/db_backup_cfg.xml
+USR_CFG_TYPE_FILE=/userconfig/flag_type
+
+### ������
+ETC_DB_DEFAULT_CFG_XML=/etc/db_default_cfg.xml
+ETC_DB_RUSSIA_CFG_XML=/etc/db_default_Russia_cfg.xml
+ETC_DB_LITHUANIA_CFG_XML=/etc/db_default_Lithuania_cfg.xml
+ETC_DB_ROMANIA_CFG_XML=/etc/db_default_Romania_cfg.xml
+ETC_DB_SINGAPORE_CFG_XML=/etc/db_default_Singapore_cfg.xml
+
+### ������, ���ա��½������ϵ��š��Ĵ����������Ϻ������졢���������ա�ɽ�����㶫
+ETC_DB_JIANGSU_CFG_XML=/etc/db_default_Jiangsu_cfg.xml
+ETC_DB_XINJIANG_CFG_XML=/etc/db_default_Xinjiang_cfg.xml
+ETC_DB_HAINANDIANXIN_CFG_XML=/etc/db_default_Hainandianxin_cfg.xml
+ETC_DB_SICHUAN_CFG_XML=/etc/db_default_Sichuan_cfg.xml
+ETC_DB_HUBEI_CFG_XML=/etc/db_default_Hubei_cfg.xml
+ETC_DB_SHANGHAI_CFG_XML=/etc/db_default_Shanghai_cfg.xml
+ETC_DB_CHONGQING_CFG_XML=/etc/db_default_Chongqing_cfg.xml
+ETC_DB_BEIJING_CFG_XML=/etc/db_default_Beijing_cfg.xml
+ETC_DB_ANHUI_CFG_XML=/etc/db_default_Anhui_cfg.xml
+ETC_DB_SHANDONG_CFG_XML=/etc/db_default_Shandong_cfg.xml
+ETC_DB_GUANGDONG_CFG_XML=/etc/db_default_Guangdong_cfg.xml
+ETC_DB_SUZHOU_CFG_XML=/etc/db_default_Suzhou_cfg.xml
+
+ETC_DB_REGIONCODE=/etc/init.d/regioncode
+
+copy_CFGFILE_by_REGIONCODE() {
+
+	regioncode=$1	
+	regionname=`busybox awk -F: -v regioncode="$regioncode" '$1==regioncode {print $2}' $ETC_DB_REGIONCODE`		
+	echo "==================================================================="	
+	echo "region code:$regioncode"	
+	echo "region name:$regionname"			
+	ETC_DB_CFG_XML=/etc/db_default_${regionname}_cfg.xml	
+	if [ -f "$ETC_DB_CFG_XML" ]; then		
+		busybox cmp $ETC_DB_CFG_XML $USR_DB_DEFAULT_CFG_XML 1>/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "USR_DB_DEFAULT_CFG is different from ETC_DB_CFG!"
+		echo "cp $ETC_DB_CFG_XML to $USR_DB_DEFAULT_CFG_XML "		
+		cp -f $ETC_DB_CFG_XML  $USR_DB_DEFAULT_CFG_XML	
+	else	    
+			echo "USER_CFG is same as ETC_CFG, donot need copy"
+		fi
+	else	    
+		echo "current : 0" > $USR_CFG_TYPE_FILE	
+	fi	
+	echo "==================================================================="
+}
+
+if [ ! -f $USR_DB_DEFAULT_CFG_XML ]; then
+  cp -f $ETC_DB_DEFAULT_CFG_XML $USR_DB_DEFAULT_CFG_XML
+  if [ -f $USR_DB_BACKUP_CFG_XML ]; then
+	echo "  $USR_DB_BACKUP_CFG_XML found, deleted"
+    rm -f $USR_DB_BACKUP_CFG_XML
+  fi
+fi
+
+echo `date` > /userconfig/cfg/flag_usrfs
+  
+if [ ! -f $USR_CFG_TYPE_FILE ]; then
+	echo "current : 0" > $USR_CFG_TYPE_FILE
+	cp -f $ETC_DB_DEFAULT_CFG_XML $USR_DB_DEFAULT_CFG_XML
+else
+	idx=`cat $USR_CFG_TYPE_FILE | grep 'current' | sed -e 's/^current \: /\1/'`
+	if [ -n "$idx" ]; then
+	   
+	  copy_CFGFILE_by_REGIONCODE $idx
+	  
+	  if [ $idx -gt $USR_DB_CFG_TYPE_MAX ]; then
+	    echo "current : 0" > $USR_CFG_TYPE_FILE
+		echo "  Warning: $idx unsupported, using default setting"
+	  fi
+	else
+	  echo "current : 0" > $USR_CFG_TYPE_FILE
+	fi
+	
+	idx=`cat $USR_CFG_TYPE_FILE | grep 'current' | sed -e 's/^current \: /\1/'`
+	if [ $idx -eq 0 ]; then
+		busybox cmp $ETC_DB_DEFAULT_CFG_XML $USR_DB_DEFAULT_CFG_XML 1>/dev/null 2>&1
+		if [ $? -ne 0 ]; then
+			echo "USR_DB_DEFAULT_CFG is different from ETC_DB_CFG!"
+			echo "cp $ETC_DB_DEFAULT_CFG_XML to $USR_DB_DEFAULT_CFG_XML "		
+	  cp -f $ETC_DB_DEFAULT_CFG_XML $USR_DB_DEFAULT_CFG_XML
+		else
+			echo "USER_CFG is same as ETC_CFG, donot need copy"
+		fi
+	fi
+fi
+echo "  Database default setting is [`cat $USR_CFG_TYPE_FILE`]"
+
+#
+# copy some files to /var/tmp/linux-igd, used by UPNP and SNTP
+#
+mkdir -p /var/tmp/linux-igd
+cp -f  /etc/gatedesc.skl     /var/tmp/linux-igd/gatedesc.skl
+cp -f  /etc/gateinfoSCPD.xml /var/tmp/linux-igd/gateinfoSCPD.xml
+cp -f  /etc/gateicfgSCPD.xml /var/tmp/linux-igd/gateicfgSCPD.xml
+cp -f  /etc/gateconnSCPD.xml /var/tmp/linux-igd/gateconnSCPD.xml
+
+pc &
+
+#
+# host name
+#
+hostname -F /proc/csp/boardtype
+```
+
+lets start our beloved reality show
+
+### *🛠 rcS – The Router’s Morning Routine*
+"Wake up, make coffee, mount /proc." — ZTE F601, probably.
+
+# 1️⃣ Mount All the Things
+```sh
+Copy
+Edit
+mount -a
+```
+Like making sure all your limbs are attached before getting out of bed — this mounts every filesystem in /etc/fstab.
+
+# 2️⃣ Set the Stage
+```sh
+Copy
+Edit
+PATH=/sbin:/bin:/usr/sbin:/usr/bin
+runlevel=S
+prevlevel=N
+umask 022
+```
+PATH – So commands don’t get lost on the way to work.
+
+runlevel=S – Single-user mode. (Safe boots are for Mondays.)
+
+umask 022 – Because letting everyone write to files is a bad idea.
+
+# 3️⃣ Service Roll Call – /etc/rcS.d
+For every file that starts with S?? in /etc/rcS.d:
+
+If it ends with .sh, source it (fast and intimate).
+
+Otherwise, fork it into a subprocess (the cold corporate handshake).
+
+# 4️⃣ The Great Region Code Lottery 🎰
+Because your router wants to know if it’s in:
+
+Russia 🇷🇺
+
+Singapore 🇸🇬
+
+Lithuania 🇱🇹
+
+Romania 🇷🇴
+
+Or one of 14+ Chinese provinces 🀄
+
+It runs copy_CFGFILE_by_REGIONCODE to pick the right /etc/db_default_<region>_cfg.xml.
+If nothing matches? Default config, baby.
+
+# 5️⃣ Backup? What Backup?
+If the default user config doesn’t exist:
+
+Copy it from /etc/ defaults.
+
+Delete backups like a rebellious teenager hiding bad grades.
+
+# 6️⃣ UPNP & SNTP Party Pack 🎉
+```sh
+Copy
+Edit
+mkdir -p /var/tmp/linux-igd
+cp /etc/gatedesc.skl ...
+```
+Prepares XML files so devices can discover the router and keep time like civilized tech.
+
+# 7️⃣ The Mysterious pc &
+Launched in the background.
+We don’t know what it does, but it sounds important… or like it could nuke the network from orbit.
+
+# 8️⃣ Name Thyself
+```sh
+Copy
+Edit
+hostname -F /proc/csp/boardtype
+```
+Sets hostname based on the board type. Because identity is important.
+and thats it.... i mean thats a lot, but thats it.
+and the best part is right here:
+```bash
+for i in /etc/rcS.d/S??*
+do
+	# Ignore dangling symlinks for now.
+	[ ! -f "$i" ] && continue
+
+	case "$i" in
+		*.sh)
+			# Source shell script for speed.
+			(
+				trap - INT QUIT TSTP
+				set start
+				. $i
+			)
+			;;
+		*)
+			# No sh extension, so fork subprocess.
+			$i start
+			;;
+	esac
+done
+```
+it executes every file inside the rcS.d,
+now we can look inside and understand what's going on, and also, in case we are a "bad hacker" we can drop there whatever script we want and it will get executed when the router will start, good and bad, but of course we are "doing that for a learning oppertunity and not to be the bad guys :]"
+so lets see (for now by name) if there are any good scripts that can run there:
+
+```bash
+_F601_V6.0.1P1T12_UPGRADE_BOOTLDR.bin.extracted/_140.extracted/cpio-root/etc/init.d$ ls ../rcS.d/
+S01usercfg  S20tsmac  S30network  S43BSPDriver  S50httpd  S99modules
+```
+ok hell yeah, everything looks just as dangerous and open as i thought it would be... so lets gooo!!!!
+the first thing i will look through is the user config, it may set a default password or anything good for first entry :)
+
+
+after wasting 2 hours of my life understanding what the heck went there, i can say its not important, it loads the base of the drivers, and run a quick test to make sure everything is good, so the next one will be S30network
+but also here, i wont waste your time and say, this script just takes the network interfaces configurations from /sys and applys them :)
+so httpd maybe the gold mine
+ok its just starting up the apache services, could be vulnrable, but for tommorow, not today :).
